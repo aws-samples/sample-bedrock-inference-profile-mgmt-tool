@@ -24,7 +24,7 @@ This tool provides a comprehensive solution for managing AWS Bedrock Application
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd tag_bedrock
+cd sample-bedrock-inference-profile-mgmt-tool
 ```
 
 2. Create and activate a virtual environment:
