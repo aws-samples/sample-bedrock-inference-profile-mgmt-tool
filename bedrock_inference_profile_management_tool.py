@@ -22,7 +22,7 @@ Operations:
   - Create new inference profiles with tags
   - List existing application inference profiles
   - Delete existing profiles
-  - Support both Foundation Models and Cross-region Inference Profiles
+  - Support both Foundation Models and Inference Profiles(including Cross-region Inference Profiles)
   - Export profile information to CSV
         """)
     
@@ -153,7 +153,7 @@ def get_valid_models(session: boto3.Session) -> list:
 
 def list_inference_profiles(session, region: str = None, type: str = 'SYSTEM_DEFINED') -> list:
     """
-    List all cross-region inference profiles across regions.
+    List all inference profiles across regions.
     
     Args:
         session: boto3.Session object
@@ -312,7 +312,7 @@ def interactive_create_inference_profile():
             print("\n=== Create Application Inference Profile ===")
             
             profile_name = get_user_input("Please input Inference Profile Name")
-            type = get_user_input("Please select Model Type: Foundation Model<1> or (Cross-region)Inference Profile<2>","1")
+            type = get_user_input("Please select Model Type: Foundation Model<1> or Inference Profile<2>","1")
             model_arn =""
             if type == "1":
                 # Add model listing functionality with retry logic
@@ -334,7 +334,7 @@ def interactive_create_inference_profile():
                 print(f"Selected model ARN: {model_arn}")
 
             else:
-                print("\n=== List (Cross-region) Inference Profiles ===")
+                print("\n=== List Inference Profiles ===")
                 profiles = get_inference_profiles(session, os.environ['AWS_REGION'])
                 selected_profile = None
                 while True:
