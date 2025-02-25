@@ -13,10 +13,10 @@ def parse_arguments() -> argparse.Namespace:
         epilog="""
 Examples:
   # Create a new inference profile (interactive mode)
-  python create_inference_profile_interactive.py
+  python3 create_inference_profile_interactive.py
   
   # List and manage existing inference profiles
-  python create_inference_profile_interactive.py -l
+  python3 create_inference_profile_interactive.py -l
   
 Operations:
   - Create new inference profiles with tags
