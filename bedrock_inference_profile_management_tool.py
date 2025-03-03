@@ -182,6 +182,7 @@ def list_inference_profiles(session, region: str = None, type: str = 'SYSTEM_DEF
                 profiles.append({
                     'region': region,
                     'name': profile.get('inferenceProfileName'),
+                    'modelArn': profile.get('models')[0].get('modelArn'),
                     'inferenceProfileArn': profile.get('inferenceProfileArn'),
                     'modelId': profile.get('inferenceProfileId'),
                     'status': profile.get('status'),
@@ -204,6 +205,7 @@ def display_inference_profiles(profiles: list):
         print(f"\n{idx}. Profile Name: {profile['name']}")
         print(f"   Region: {profile['region']}")
         print(f"   Model ID: {profile['modelId']}")
+        print(f"   Model ARN: {profile['modelArn']}")
         print(f"   Status: {profile['status']}")
         print(f"   ARN: {profile['inferenceProfileArn']}")
         if profile['tags']:
