@@ -178,11 +178,11 @@ def list_inference_profiles(session, region: str = None, type: str = 'SYSTEM_DEF
                     tags = tags_response.get('tags', [])
                 except Exception as e:
                     tags = []
-                
+
                 profiles.append({
                     'region': region,
                     'name': profile.get('inferenceProfileName'),
-                    'modelArn': profile.get('models')[0].get('modelArn'),
+                    'modelArn': [model.get('modelArn') for model in profile.get('models', [])],
                     'inferenceProfileArn': profile.get('inferenceProfileArn'),
                     'modelId': profile.get('inferenceProfileId'),
                     'status': profile.get('status'),
@@ -205,7 +205,10 @@ def display_inference_profiles(profiles: list):
         print(f"\n{idx}. Profile Name: {profile['name']}")
         print(f"   Region: {profile['region']}")
         print(f"   Model ID: {profile['modelId']}")
-        print(f"   Model ARN: {profile['modelArn']}")
+        if profile['modelArn']:
+            print("   Model ARNs:")
+            for model in profile['modelArn']:
+                print(f"     - {model}")
         print(f"   Status: {profile['status']}")
         print(f"   ARN: {profile['inferenceProfileArn']}")
         if profile['tags']:
