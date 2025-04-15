@@ -36,38 +36,32 @@ Operations:
     return parser.parse_args()
 
 def initBoto3Session() -> boto3.Session:
-    profiles = boto3.Session().available_profiles
-    if profiles:
-        print("\n=== Choose Credential Profile ===")
+    session = boto3.Session()
+    credentials = session.get_credentials()
+    services = session.get_available_services()
+    profiles = session.available_profiles
+
+    # First use AWS Credential from the Role
+    if credentials and 'bedrock' in services:
+        print("\n=== Will use AWS Credential from the Role ===")
+
+    # Second use AWS Credential from the Profile
+    elif profiles:
+        print("\n=== Choose AWS Credential Profile ===")
         for idx, profile in enumerate(profiles):
             print(f"{idx}. {profile}")
-        profile_index = int(get_user_input("Please select credential profile to use","0"))
+        profile_index = int(get_user_input("Please select credential profile to use", "0"))
         profile_name = profiles[profile_index]
-        _session = boto3.Session(profile_name=profile_name)
-        # Use profile credentials
-        credentials = _session.get_credentials()
-        # Set env
-        os.environ['AWS_ACCESS_KEY_ID'] = credentials.access_key
-        os.environ['AWS_SECRET_ACCESS_KEY'] = credentials.secret_key
+        session = boto3.Session(profile_name=profile_name)
 
+    # Third use AWS Credential from the Input
     else:
-        credentials = boto3.Session().get_credentials()
-        if credentials:
-            print("\n=== Will use AWS Credential from the Role ===")
-            os.environ['AWS_ACCESS_KEY_ID'] = credentials.access_key
-            os.environ['AWS_SECRET_ACCESS_KEY'] = credentials.secret_key
-        else:
-            print("\n=== Input AWS Credential Information ===")
-            # Set env
-            os.environ['AWS_ACCESS_KEY_ID'] = get_user_input("Please input AWS Access Key ID", is_secret=True)
-            os.environ['AWS_SECRET_ACCESS_KEY'] = get_user_input("Please input AWS Secret Access Key", is_secret=True)
+        print("\n=== Input AWS Credential Information ===")
+        # Set env
+        ak = get_user_input("Please input AWS Access Key ID", is_secret=True)
+        sk = get_user_input("Please input AWS Secret Access Key", is_secret=True)
+        session = boto3.Session(aws_access_key_id=ak, aws_secret_access_key=sk)
 
-    region = get_user_input("Please input Region", "us-west-2")
-    os.environ['AWS_REGION'] = region
-
-    session = boto3.Session(aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'], 
-                            aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'], 
-                            region_name=region)
     return session
 
 def get_user_input(prompt: str, default: str = None, is_secret: bool = False) -> str:
@@ -91,40 +85,6 @@ def get_tags_input() -> list:
         tags.append({'key': key, 'value': value})
     return tags
 
-def list_available_models(session, keyword: str = None) -> list:
-    """
-    List available Bedrock models that support ON_DEMAND inference, optionally filtered by keyword.
-    
-    Args:
-        session: boto3.Session object
-        keyword: Optional string to filter model names
-        
-    Returns:
-        list of dictionaries containing model information
-    """
-    try:
-        bedrock = session.client('bedrock')
-        response = bedrock.list_foundation_models()
-        models = []
-        
-        for model in response['modelSummaries']:
-            model_id = model['modelId']
-            inference_types = model.get('inferenceTypesSupported', [])
-            
-            # Only include models that support ON_DEMAND inference
-            if 'ON_DEMAND' in inference_types:
-                if keyword is None or keyword.lower() in model_id.lower():
-                    models.append({
-                        'modelId': model_id,
-                        'providerName': model.get('providerName', 'N/A'),
-                        'modelName': model.get('modelName', 'N/A')
-                    })
-        
-        return models
-    except Exception as e:
-        print(f"Error listing models: {str(e)}")
-        return []
-
 def display_models(models: list):
     """Display models in a formatted way"""
     if not models:
@@ -138,12 +98,12 @@ def display_models(models: list):
         print(f"   Provider: {model['providerName']}")
         print(f"   Name: {model['modelName']}")
 
-def get_valid_models(session: boto3.Session) -> list:
+def get_valid_models(bedrock_tagger: BedrockTagger) -> list:
     """
     Keep asking for keyword until we get some models to display
     
     Args:
-        session: boto3.Session object
+        bedrock_tagger: BedrockTaggers object
         
     Returns:
         list of models
@@ -153,55 +113,13 @@ def get_valid_models(session: boto3.Session) -> list:
         if not keyword:
             print("Please enter a valid keyword.")
             continue
-        models = list_available_models(session, keyword)
+        models = bedrock_tagger.list_available_models(keyword)
         
         if models:
             display_models(models)
             return models
         else:
-            print("\nNo models found with the given keyword. Please try again.")        
-
-def list_inference_profiles(session, region: str = None, type: str = 'APPLICATION') -> list:
-    """
-    List all inference profiles across regions.
-    
-    Args:
-        session: boto3.Session object
-        region: Optional string to filter by specific region
-        
-    Returns:
-        list of dictionaries containing profile information
-    """
-    profiles = []
-
-    try:
-        bedrock = session.client('bedrock', region_name=region)
-        paginator = bedrock.get_paginator('list_inference_profiles')
-
-        for page in paginator.paginate(typeEquals=type):
-            for profile in page.get('inferenceProfileSummaries', []):
-                # Get tags for each profile
-                try:
-                    tags_response = bedrock.list_tags_for_resource(
-                        resourceARN=profile.get('inferenceProfileArn')
-                    )
-                    tags = tags_response.get('tags', [])
-                except Exception as e:
-                    tags = []
-
-                profiles.append({
-                    'region': region,
-                    'name': profile.get('inferenceProfileName'),
-                    'modelArn': [model.get('modelArn') for model in profile.get('models', [])],
-                    'inferenceProfileArn': profile.get('inferenceProfileArn'),
-                    'modelId': profile.get('inferenceProfileId'),
-                    'status': profile.get('status'),
-                    'tags': tags
-                })
-
-    except Exception as e:
-        print(f"Error listing profiles in region {region}: {str(e)}")
-    return profiles
+            print("\nNo models found with the given keyword. Please try again.")
 
 def display_inference_profiles(profiles: list):
     """Display inference profiles in a formatted way"""
@@ -226,16 +144,16 @@ def display_inference_profiles(profiles: list):
             for tag in profile['tags']:
                 print(f"     - {tag['key']}: {tag['value']}")
 
-def get_inference_profiles(session: boto3.Session, region: str = None) -> list:
+def get_inference_profiles(bedrock_tagger: BedrockTagger) -> list:
     """
     Args:
-        session: boto3.Session object
+        bedrock_tagger: BedrockTaggers object
         
     Returns:
         list of inference profiles
     """
     while True:
-        profiles = list_inference_profiles(session, region)
+        profiles = bedrock_tagger.list_inference_profiles(type='SYSTEM_DEFINED')
         
         if profiles:
             display_inference_profiles(profiles)
@@ -286,29 +204,10 @@ def save_to_csv(profiles: list, tags: list, filename: str = None):
     except Exception as e:
         print(f"\n❌ Error saving to CSV: {str(e)}")
 
-def delete_inference_profile(session: boto3.Session, profile_arn: str) -> bool:
-    """
-    Delete an inference profile by ARN
-    
-    Args:
-        session: boto3.Session object
-        profile_arn: ARN of the profile to delete
-        
-    Returns:
-        bool: True if deletion was successful, False otherwise
-    """
-    try:
-        bedrock = session.client('bedrock')
-        bedrock.delete_inference_profile(inferenceProfileIdentifier=profile_arn)
-        print(f"\n✅ Successfully deleted inference profile: {profile_arn}")
-        return True
-    except Exception as e:
-        print(f"\n❌ Error deleting profile: {str(e)}")
-        return False
-
 def interactive_create_inference_profile():
     # 1.List profiles and select profile or input AWS Credential Information
     session = initBoto3Session()
+    region = get_user_input("Please input Region", "us-west-2")
 
     # 2. Set tag information
     print("\n=== Tag Configuration ===")
@@ -319,7 +218,7 @@ def interactive_create_inference_profile():
     session_filename = f"inference_profiles_{timestamp}.csv"
 
     # 4. Initialize BedrockTagger 
-    bedrock_manager = BedrockTagger()
+    bedrock_tagger = BedrockTagger(session, region)
 
     # 5. Create Inference Profile
     while True:
@@ -327,12 +226,12 @@ def interactive_create_inference_profile():
             print("\n=== Create Application Inference Profile ===")
             
             profile_name = get_user_input("Please input Inference Profile Name")
-            type = get_user_input("Please select Model Type: Foundation Model<1> or Inference Profile<2>","1")
+            type = get_user_input("Please select Model Type: Foundation Model<1> or Inference Profile<2>", "1")
             model_arn =""
             if type == "1":
                 # Add model listing functionality with retry logic
                 print("\n=== List Available Models ===")
-                models = get_valid_models(session)
+                models = get_valid_models(bedrock_tagger)
                 selected_model = None
                 while True:
                     try:
@@ -345,12 +244,12 @@ def interactive_create_inference_profile():
                     except ValueError:
                         print("Please enter a valid number")
                 
-                model_arn = f"arn:aws:bedrock:{os.environ['AWS_REGION']}::foundation-model/{selected_model['modelId']}"
+                model_arn = f"arn:aws:bedrock:{region}::foundation-model/{selected_model['modelId']}"
                 print(f"Selected model ARN: {model_arn}")
 
             else:
                 print("\n=== List Inference Profiles ===")
-                profiles = get_inference_profiles(session, os.environ['AWS_REGION'])
+                profiles = get_inference_profiles(bedrock_tagger)
                 selected_profile = None
                 while True:
                     try:
@@ -368,7 +267,7 @@ def interactive_create_inference_profile():
 
             # Start to Create Inference Profile
             print("\nCreating Inference Profile...")
-            response = bedrock_manager.create_inference_profile(profile_name, model_arn, tags)
+            response = bedrock_tagger.create_inference_profile(profile_name, model_arn, tags)
             print(f"\n✅ Your Application Inference Profile Creation Succeeded, ARN: {response['inferenceProfileArn']}")
 
             # Save each successful creation immediately
@@ -391,10 +290,12 @@ def interactive_create_inference_profile():
 
 def interactive_list_inference_profile():
     session = initBoto3Session()
+    region = get_user_input("Please input Region", "us-west-2")
+    bedrock_tagger = BedrockTagger(session, region)
         
     # List application inference profiles
     print("\nListing Application inference profiles...")
-    profiles = list_inference_profiles(session, os.environ['AWS_REGION'], type='APPLICATION')
+    profiles = bedrock_tagger.list_inference_profiles(type='APPLICATION')
     display_inference_profiles(profiles)
 
     # Ask if user wants to delete any profiles
@@ -405,7 +306,7 @@ def interactive_list_inference_profile():
                 if 0 <= profile_index < len(profiles):
                     profile = profiles[profile_index]
                     if get_user_input(f"\nConfirm deletion of profile '{profile['modelId']}'? (y/n)", "n").lower() == 'y':
-                        delete_inference_profile(session, profile['modelId'])
+                        bedrock_tagger.delete_inference_profile(profile['modelId'])
                 else:
                     print(f"Please enter a valid index between 0 and {len(profiles)-1}")
                 
