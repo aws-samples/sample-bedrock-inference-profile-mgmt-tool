@@ -46,10 +46,4 @@ class BedrockTagger:
 
     def delete_inference_profiles(self,profile_name):
         
-        self.bedrock_client.delete_inference_profile(
-            inferenceProfileIdentifier=profile_name)     
-
-
-
-
-    
+        self.bedrock_client.delete_inference_profile(inferenceProfileIdentifier=profile_name)

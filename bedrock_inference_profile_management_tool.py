@@ -2,8 +2,9 @@ import os
 import boto3
 import csv
 import argparse
-from datetime import datetime
 from bedrock_tagger import BedrockTagger
+from datetime import datetime
+from getpass import getpass
 
 def parse_arguments() -> argparse.Namespace:
     """Parse command line arguments"""
@@ -50,10 +51,16 @@ def initBoto3Session() -> boto3.Session:
         os.environ['AWS_SECRET_ACCESS_KEY'] = credentials.secret_key
 
     else:
-        print("\n=== Input AWS Credential Information ===")
-        # Set env
-        os.environ['AWS_ACCESS_KEY_ID'] = get_user_input("Please input AWS Access Key ID")
-        os.environ['AWS_SECRET_ACCESS_KEY'] = get_user_input("Please input AWS Secret Access Key")
+        credentials = boto3.Session().get_credentials()
+        if credentials:
+            print("\n=== Will use AWS Credential from the Role ===")
+            os.environ['AWS_ACCESS_KEY_ID'] = credentials.access_key
+            os.environ['AWS_SECRET_ACCESS_KEY'] = credentials.secret_key
+        else:
+            print("\n=== Input AWS Credential Information ===")
+            # Set env
+            os.environ['AWS_ACCESS_KEY_ID'] = get_user_input("Please input AWS Access Key ID", is_secret=True)
+            os.environ['AWS_SECRET_ACCESS_KEY'] = get_user_input("Please input AWS Secret Access Key", is_secret=True)
 
     region = get_user_input("Please input Region", "us-west-2")
     os.environ['AWS_REGION'] = region
@@ -63,11 +70,14 @@ def initBoto3Session() -> boto3.Session:
                             region_name=region)
     return session
 
-def get_user_input(prompt: str, default: str = None) -> str:
+def get_user_input(prompt: str, default: str = None, is_secret: bool = False) -> str:
     """Get user input and support the default value."""
+    if is_secret:
+        return getpass(f"{prompt}: ").strip()
     if default:
         user_input = input(f"{prompt} [{default}]: ").strip()
         return user_input if user_input else default
+
     return input(f"{prompt}: ").strip()
 
 def get_tags_input() -> list:
@@ -151,7 +161,7 @@ def get_valid_models(session: boto3.Session) -> list:
         else:
             print("\nNo models found with the given keyword. Please try again.")        
 
-def list_inference_profiles(session, region: str = None, type: str = 'SYSTEM_DEFINED') -> list:
+def list_inference_profiles(session, region: str = None, type: str = 'APPLICATION') -> list:
     """
     List all inference profiles across regions.
     
