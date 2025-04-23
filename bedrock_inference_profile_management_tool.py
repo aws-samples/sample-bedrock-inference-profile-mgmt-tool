@@ -41,25 +41,26 @@ def initBoto3Session() -> boto3.Session:
     services = session.get_available_services()
     profiles = session.available_profiles
 
-    # First use AWS Credential from the Role
+    # Get AWS Credential
     if credentials and 'bedrock' in services:
-        print("\n=== Will use AWS Credential from the Role ===")
+        # Use AWS Credential from the Profile
+        if profiles:
+            print("\n=== Choose AWS Credential Profile ===")
+            for idx, profile in enumerate(profiles):
+                print(f"{idx}. {profile}")
+            profile_index = int(input("\nSelect profile [0]: ").strip() or "0")
+            profile_name = profiles[profile_index]
+            session = boto3.Session(profile_name=profile_name)
+        # Use AWS Credential from the Role
+        else:
+            print("\n=== Will use AWS Credential from the Role ===")
 
-    # Second use AWS Credential from the Profile
-    elif profiles:
-        print("\n=== Choose AWS Credential Profile ===")
-        for idx, profile in enumerate(profiles):
-            print(f"{idx}. {profile}")
-        profile_index = int(get_user_input("Please select credential profile to use", "0"))
-        profile_name = profiles[profile_index]
-        session = boto3.Session(profile_name=profile_name)
-
-    # Third use AWS Credential from the Input
+    # Use AWS Credential from the Input AK/SK
     else:
         print("\n=== Input AWS Credential Information ===")
         # Set env
-        ak = get_user_input("Please input AWS Access Key ID", is_secret=True)
-        sk = get_user_input("Please input AWS Secret Access Key", is_secret=True)
+        ak = get_user_input("Enter AWS Access Key ID (hidden)", is_secret=True)
+        sk = get_user_input("Enter AWS Secret Access Key (hidden)", is_secret=True)
         session = boto3.Session(aws_access_key_id=ak, aws_secret_access_key=sk)
 
     return session
@@ -80,8 +81,8 @@ def get_tags_input() -> list:
     while True:
         if tags and get_user_input("Continue adding tags?(y/n)", "n").lower() != 'y':
             break
-        key = get_user_input("Please input the tag key", "map-migrated")
-        value = get_user_input("Please input the tag value")
+        key = get_user_input("Enter the tag key", "map-migrated")
+        value = get_user_input("Enter the tag value")
         tags.append({'key': key, 'value': value})
     return tags
 
@@ -207,7 +208,7 @@ def save_to_csv(profiles: list, tags: list, filename: str = None):
 def interactive_create_inference_profile():
     # 1.List profiles and select profile or input AWS Credential Information
     session = initBoto3Session()
-    region = get_user_input("Please input Region", "us-west-2")
+    region = get_user_input("Enter Region", "us-west-2")
 
     # 2. Set tag information
     print("\n=== Tag Configuration ===")
@@ -225,8 +226,8 @@ def interactive_create_inference_profile():
         try:
             print("\n=== Create Application Inference Profile ===")
             
-            profile_name = get_user_input("Please input Inference Profile Name")
-            type = get_user_input("Please select Model Type: Foundation Model<1> or Inference Profile<2>", "1")
+            profile_name = get_user_input("Enter Inference Profile Name")
+            type = get_user_input("Select Model Type: Foundation Model<1> or Inference Profile<2>", "1")
             model_arn =""
             if type == "1":
                 # Add model listing functionality with retry logic
@@ -235,7 +236,7 @@ def interactive_create_inference_profile():
                 selected_model = None
                 while True:
                     try:
-                        model_index = int(get_user_input("Please select model index"))
+                        model_index = int(get_user_input("Select model index"))
                         if 0 <= model_index < len(models):
                             selected_model = models[model_index]
                             break
@@ -253,7 +254,7 @@ def interactive_create_inference_profile():
                 selected_profile = None
                 while True:
                     try:
-                        profile_index = int(get_user_input("Please select profile index"))
+                        profile_index = int(get_user_input("Select profile index"))
                         if 0 <= profile_index < len(profiles):
                             selected_profile = profiles[profile_index]
                             break
@@ -290,7 +291,7 @@ def interactive_create_inference_profile():
 
 def interactive_list_inference_profile():
     session = initBoto3Session()
-    region = get_user_input("Please input Region", "us-west-2")
+    region = get_user_input("Enter Region", "us-west-2")
     bedrock_tagger = BedrockTagger(session, region)
         
     # List application inference profiles
@@ -302,7 +303,7 @@ def interactive_list_inference_profile():
     if profiles and get_user_input("\nWould you like to delete any profile? (y/n)", "n").lower() == 'y':
         while True:
             try:
-                profile_index = int(get_user_input("\nPlease select profile index to delete"))
+                profile_index = int(get_user_input("\nSelect profile index to delete"))
                 if 0 <= profile_index < len(profiles):
                     profile = profiles[profile_index]
                     if get_user_input(f"\nConfirm deletion of profile '{profile['modelId']}'? (y/n)", "n").lower() == 'y':
