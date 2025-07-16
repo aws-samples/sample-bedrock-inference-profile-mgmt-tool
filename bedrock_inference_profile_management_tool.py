@@ -21,11 +21,11 @@ Examples:
   python3 create_inference_profile_interactive.py -l
 
   # Batch create inference profiles from a yaml file
-  python3 bedrock_inference_profile_management_tool.py -f ./bedrock-tags.yaml
+  python3 bedrock_inference_profile_management_tool.py -f ./bedrock-profiles.yaml
   
 Operations:
   - Create new inference profiles with tags
-  - Batch create inference profiles with tags from a yaml file 
+  - Batch create inference profiles with tags from a yaml file
   - List existing application inference profiles
   - Delete existing profiles
   - Support both Foundation Models and Inference Profiles(including Cross-region Inference Profiles)
