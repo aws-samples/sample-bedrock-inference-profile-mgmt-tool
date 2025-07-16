@@ -1,7 +1,8 @@
-import os
+import argparse
 import boto3
 import csv
-import argparse
+import os
+import yaml
 from bedrock_tagger import BedrockTagger
 from datetime import datetime
 from getpass import getpass
@@ -18,9 +19,13 @@ Examples:
   
   # List and manage existing inference profiles
   python3 create_inference_profile_interactive.py -l
+
+  # Batch create inference profiles from a yaml file
+  python3 bedrock_inference_profile_management_tool.py -f ./bedrock-tags.yaml
   
 Operations:
   - Create new inference profiles with tags
+  - Batch create inference profiles with tags from a yaml file 
   - List existing application inference profiles
   - Delete existing profiles
   - Support both Foundation Models and Inference Profiles(including Cross-region Inference Profiles)
@@ -31,6 +36,11 @@ Operations:
         '-l', '--list',
         action='store_true',
         help='List all Application inference profiles and provide option to delete'
+    )
+    parser.add_argument(
+        '-f', '--file',
+        type=str,
+        help='Path to a yaml file for batch creation'
     )
     
     return parser.parse_args()
@@ -293,7 +303,7 @@ def interactive_list_inference_profile():
     session = initBoto3Session()
     region = get_user_input("Enter Region", "us-west-2")
     bedrock_tagger = BedrockTagger(session, region)
-        
+
     # List application inference profiles
     print("\nListing Application inference profiles...")
     profiles = bedrock_tagger.list_inference_profiles(type='APPLICATION')
@@ -317,11 +327,68 @@ def interactive_list_inference_profile():
             except ValueError:
                 print("Please enter a valid number")
 
+def batch_create_inference_profiles(config_file):
+    # Determine file type (YAML or JSON) and load accordingly
+    if config_file.endswith('.yaml') or config_file.endswith('.yml'):
+        with open(config_file, 'r') as f:
+            config = yaml.safe_load(f)
+    else:
+        print(f"❌ Unsupported file format: {config_file}")
+        return
+    
+    # Initialize session (may need to modify to support non-interactive credential selection)
+    session = initBoto3Session()
+    region = config.get('region')
+    if not region:
+        region = get_user_input("Enter Region", "us-west-2")
+
+    tags = config.get('tags')
+
+    # Initialize BedrockTagger
+    bedrock_tagger = BedrockTagger(session, region)
+
+    # Create CSV file for results
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    session_filename = f"inference_profiles_{timestamp}.csv"
+    
+    # Process each profile
+    for profile_config in config.get('bedrick-profiles', []):
+        try:
+            profile_name = profile_config.get('name')
+            model_type = profile_config.get('model_type')
+            model_id = profile_config.get('model_id')
+
+            print(f"\nThe processing model is: {model_id}...")
+            # Construct model ARN based on type
+            model_arn = ""
+            if model_type == "foundation":
+                model_arn = f"arn:aws:bedrock:{region}::foundation-model/{model_id}"
+            elif model_type == "inference":
+                # Assume model_id is already a full ARN for inference profiles
+                model_arn = model_id
+            
+            print(f"Creating Inference Profile with model ARN: {model_arn}")
+            response = bedrock_tagger.create_inference_profile(profile_name, model_arn, tags)
+            print(f"✅ Inference Profile created: {response['inferenceProfileArn']}")
+
+            # Save to CSV
+            new_profile = {
+                'name': profile_name,
+                'inferenceProfileArn': response['inferenceProfileArn']
+            }
+            save_to_csv([new_profile], tags, filename=session_filename)
+            
+        except Exception as e:
+            print(f"❌ Error creating profile {profile_name}: {str(e)}")
+            continue
+
 if __name__ == "__main__":
     """Main function to handle different commands"""
     args = parse_arguments()
 
-    if args.list:
+    if args.file:
+        batch_create_inference_profiles(args.file)
+    elif args.list:
         interactive_list_inference_profile()
     else:
         interactive_create_inference_profile()
