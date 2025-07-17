@@ -352,7 +352,7 @@ def batch_create_inference_profiles(config_file):
     session_filename = f"inference_profiles_{timestamp}.csv"
     
     # Process each profile
-    for profile_config in config.get('bedrick-profiles', []):
+    for profile_config in config.get('bedrock-profiles', []):
         try:
             profile_name = profile_config.get('name')
             model_type = profile_config.get('model_type')

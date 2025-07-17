@@ -5,7 +5,7 @@ tags:
   - key: "map-migrated"
     value: "migXXXXXXXXXX"
 
-bedrick-profiles:
+bedrock-profiles:
   - name: "claude35"
     model_id: "anthropic.claude-3-5-sonnet-20240620-v1:0"  # Model ID for foundation models
     model_type: "foundation"  # Either "foundation" or "inference"
