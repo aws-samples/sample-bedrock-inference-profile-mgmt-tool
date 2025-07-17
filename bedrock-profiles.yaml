@@ -1,0 +1,15 @@
+# Bedrock Inference Profile Tagging Configuration File
+region: us-west-2
+
+tags:
+  - key: "map-migrated"
+    value: "migXXXXXXXXXX"
+
+bedrick-profiles:
+  - name: "claude35"
+    model_id: "anthropic.claude-3-5-sonnet-20240620-v1:0"  # Model ID for foundation models
+    model_type: "foundation"  # Either "foundation" or "inference"
+  
+  - name: "claude4"
+    model_id: "arn:aws:bedrock:us-west-2:604359073804:inference-profile/us.anthropic.claude-sonnet-4-20250514-v1:0" # ARN for Inference profiles
+    model_type: "inference"
