@@ -9,8 +9,8 @@ tags:
     value: "Development"
 
 # Existing profiles to tag (optional - specify either name or arn)
-existing-profiles-to-tag:
-  - name: "existing-profile-name"  # Find by profile name
+#existing-profiles-to-tag:
+  # - name: "existing-profile-name"  # Find by profile name
   # - arn: "arn:aws:bedrock:us-west-2:123456789012:inference-profile/profile-id"  # Or find by ARN
 
 # New profiles to create and tag
