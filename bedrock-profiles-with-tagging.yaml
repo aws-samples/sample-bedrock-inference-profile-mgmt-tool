@@ -1,19 +1,18 @@
-# Bedrock Inference Profile Configuration File
+# Bedrock Inference Profile Configuration File with Tagging Support
 region: us-west-2
 
 # Tags to apply to profiles
 tags:
-  - key: "map-migrated"
-    value: "migXXXXXXXXXX"
-  - key: "Environment"
-    value: "Development"
+  - key: "map-migratedv3"
+    value: "test"
 
-# Existing profiles to tag (optional - specify either name or arn)
+# Existing profiles to tag (specify either name or arn)
 existing-profiles-to-tag:
-  - name: "existing-profile-name"  # Find by profile name
-  # - arn: "arn:aws:bedrock:us-west-2:123456789012:inference-profile/profile-id"  # Or find by ARN
+  - arn: "arn:aws:bedrock:us-west-2:xxxx:application-inference-profile/rqq8qhhm7ehc"
+  - name: "test"
+  - name: "test2"  # Find by ARN
+  - arn: "arn:aws:bedrock:us-west-2:xxx:application-inference-profile/zvu5uj2f5gbu"
 
-# New profiles to create and tag
 bedrock-profiles:
   - name: "claude35"
     model_id: "anthropic.claude-3-5-sonnet-20240620-v1:0"  # Model ID for foundation models

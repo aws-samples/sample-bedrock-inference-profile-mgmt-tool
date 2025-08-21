@@ -15,17 +15,21 @@ def parse_arguments() -> argparse.Namespace:
         epilog="""
 Examples:
   # Create a new inference profile (interactive mode)
-  python3 create_inference_profile_interactive.py
+  python3 bedrock_inference_profile_management_tool.py
   
   # List and manage existing inference profiles
-  python3 create_inference_profile_interactive.py -l
+  python3 bedrock_inference_profile_management_tool.py -l
 
   # Batch create inference profiles from a yaml file
   python3 bedrock_inference_profile_management_tool.py -f ./bedrock-profiles.yaml
   
+  # Batch tag existing inference profiles from a yaml file
+  python3 bedrock_inference_profile_management_tool.py -t ./bedrock-profiles.yaml
+  
 Operations:
   - Create new inference profiles with tags
   - Batch create inference profiles with tags from a yaml file
+  - Batch tag existing inference profiles from a yaml file
   - List existing application inference profiles
   - Delete existing profiles
   - Support both Foundation Models and Inference Profiles(including Cross-region Inference Profiles)
@@ -41,6 +45,11 @@ Operations:
         '-f', '--file',
         type=str,
         help='Path to a yaml file for batch creation'
+    )
+    parser.add_argument(
+        '-t', '--tag',
+        type=str,
+        help='Path to a yaml file for batch tagging existing profiles'
     )
     
     return parser.parse_args()
@@ -218,7 +227,7 @@ def save_to_csv(profiles: list, tags: list, filename: str = None):
 def interactive_create_inference_profile():
     # 1.List profiles and select profile or input AWS Credential Information
     session = initBoto3Session()
-    region = get_user_input("Enter Region", "us-west-2")
+    region = get_user_input("Enter Region", "ap-northeast-1")
 
     # 2. Set tag information
     print("\n=== Tag Configuration ===")
@@ -301,7 +310,7 @@ def interactive_create_inference_profile():
 
 def interactive_list_inference_profile():
     session = initBoto3Session()
-    region = get_user_input("Enter Region", "us-west-2")
+    region = get_user_input("Enter Region", "ap-northeast-1")
     bedrock_tagger = BedrockTagger(session, region)
 
     # List application inference profiles
@@ -340,7 +349,7 @@ def batch_create_inference_profiles(config_file):
     session = initBoto3Session()
     region = config.get('region')
     if not region:
-        region = get_user_input("Enter Region", "us-west-2")
+        region = get_user_input("Enter Region", "ap-northeast-1")
 
     tags = config.get('tags')
 
@@ -382,12 +391,136 @@ def batch_create_inference_profiles(config_file):
             print(f"❌ Error creating profile {profile_name}: {str(e)}")
             continue
 
+def batch_tag_inference_profiles(config_file):
+    """
+    Batch tag existing inference profiles from a YAML configuration file
+    
+    Args:
+        config_file: Path to the YAML configuration file
+    """
+    # Load configuration file
+    if config_file.endswith('.yaml') or config_file.endswith('.yml'):
+        with open(config_file, 'r') as f:
+            config = yaml.safe_load(f)
+    else:
+        print(f"❌ Unsupported file format: {config_file}")
+        return
+    
+    # Initialize session
+    session = initBoto3Session()
+    region = config.get('region')
+    if not region:
+        region = get_user_input("Enter Region", "ap-northeast-1")
+
+    tags = config.get('tags')
+    if not tags:
+        print("❌ No tags found in configuration file")
+        return
+
+    # Initialize BedrockTagger
+    bedrock_tagger = BedrockTagger(session, region)
+
+    # Create CSV file for results
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    session_filename = f"tagged_profiles_{timestamp}.csv"
+    
+    # Check if we have existing profiles to tag or profiles to create and tag
+    existing_profiles_to_tag = config.get('existing-profiles-to-tag', [])
+    profiles_to_create = config.get('bedrock-profiles', [])
+    
+    tagged_profiles = []
+    
+    # Tag existing profiles
+    if existing_profiles_to_tag:
+        print(f"\n=== Tagging {len(existing_profiles_to_tag)} existing profiles ===")
+        for profile_config in existing_profiles_to_tag:
+            try:
+                profile_name = profile_config.get('name')
+                profile_arn = profile_config.get('arn')
+                
+                if not profile_name and not profile_arn:
+                    print("❌ Profile must have either 'name' or 'arn' specified")
+                    continue
+                
+                # Find profile by name if ARN not provided
+                if not profile_arn:
+                    print(f"🔍 Finding profile by name: {profile_name}")
+                    profile = bedrock_tagger.find_inference_profile_by_name(profile_name)
+                    if not profile:
+                        print(f"❌ Profile not found: {profile_name}")
+                        continue
+                    profile_arn = profile['inferenceProfileArn']
+                    profile_name = profile['name']
+                else:
+                    # Get profile details by ARN
+                    profile_details = bedrock_tagger.get_inference_profile_by_arn(profile_arn)
+                    if not profile_details:
+                        print(f"❌ Profile not found: {profile_arn}")
+                        continue
+                    profile_name = profile_details.get('inferenceProfileName', 'Unknown')
+
+                print(f"🏷️  Tagging profile: {profile_name} ({profile_arn})")
+                
+                # Tag the profile
+                success = bedrock_tagger.tag_inference_profile(profile_arn, tags)
+                if success:
+                    print(f"✅ Successfully tagged profile: {profile_name}")
+                    tagged_profiles.append({
+                        'name': profile_name,
+                        'inferenceProfileArn': profile_arn
+                    })
+                else:
+                    print(f"❌ Failed to tag profile: {profile_name}")
+                    
+            except Exception as e:
+                print(f"❌ Error processing profile {profile_config}: {str(e)}")
+                continue
+    
+    # Create and tag new profiles (existing functionality)
+    if profiles_to_create:
+        print(f"\n=== Creating and tagging {len(profiles_to_create)} new profiles ===")
+        for profile_config in profiles_to_create:
+            try:
+                profile_name = profile_config.get('name')
+                model_type = profile_config.get('model_type')
+                model_id = profile_config.get('model_id')
+
+                print(f"🔨 Creating profile: {profile_name} with model: {model_id}")
+                
+                # Construct model ARN based on type
+                model_arn = ""
+                if model_type == "foundation":
+                    model_arn = f"arn:aws:bedrock:{region}::foundation-model/{model_id}"
+                elif model_type == "inference":
+                    model_arn = model_id
+                
+                response = bedrock_tagger.create_inference_profile(profile_name, model_arn, tags)
+                print(f"✅ Inference Profile created and tagged: {response['inferenceProfileArn']}")
+
+                tagged_profiles.append({
+                    'name': profile_name,
+                    'inferenceProfileArn': response['inferenceProfileArn']
+                })
+                
+            except Exception as e:
+                print(f"❌ Error creating profile {profile_name}: {str(e)}")
+                continue
+    
+    # Save results to CSV
+    if tagged_profiles:
+        save_to_csv(tagged_profiles, tags, filename=session_filename)
+        print(f"\n📊 Tagged {len(tagged_profiles)} profiles successfully")
+    else:
+        print("\n⚠️  No profiles were tagged")
+
 if __name__ == "__main__":
     """Main function to handle different commands"""
     args = parse_arguments()
 
     if args.file:
         batch_create_inference_profiles(args.file)
+    elif args.tag:
+        batch_tag_inference_profiles(args.tag)
     elif args.list:
         interactive_list_inference_profile()
     else:

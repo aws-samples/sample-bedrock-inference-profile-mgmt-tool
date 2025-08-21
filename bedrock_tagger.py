@@ -128,4 +128,68 @@ class BedrockTagger:
 
         except Exception as e:
             print(f"Error listing profiles in region {self.region_name}: {str(e)}")
-        return profiles       
+        return profiles
+
+    def tag_inference_profile(self, profile_arn: str, tags: list) -> bool:
+        """
+        Add tags to an existing inference profile
+        
+        Args:
+            profile_arn: ARN of the inference profile to tag
+            tags: List of tag dictionaries with 'key' and 'value'
+            
+        Returns:
+            bool: True if tagging was successful, False otherwise
+        """
+        try:
+            # Convert tags to the format expected by AWS API
+            aws_tags = [{'key': tag['key'], 'value': tag['value']} for tag in tags]
+            
+            self.bedrock_client.tag_resource(
+                resourceARN=profile_arn,
+                tags=aws_tags
+            )
+            return True
+        except Exception as e:
+            print(f"❌ Error tagging profile {profile_arn}: {str(e)}")
+            return False
+
+    def get_inference_profile_by_arn(self, profile_arn: str):
+        """
+        Get inference profile details by ARN
+        
+        Args:
+            profile_arn: ARN of the inference profile
+            
+        Returns:
+            dict: Profile information or None if not found
+        """
+        try:
+            response = self.bedrock_client.get_inference_profile(
+                inferenceProfileIdentifier=profile_arn
+            )
+            return response
+        except Exception as e:
+            print(f"❌ Error getting profile {profile_arn}: {str(e)}")
+            return None
+
+    def find_inference_profile_by_name(self, profile_name: str, profile_type: str = 'APPLICATION'):
+        """
+        Find inference profile by name
+        
+        Args:
+            profile_name: Name of the inference profile to find
+            profile_type: Type of profile ('APPLICATION' or 'SYSTEM_DEFINED')
+            
+        Returns:
+            dict: Profile information or None if not found
+        """
+        try:
+            profiles = self.list_inference_profiles(type=profile_type)
+            for profile in profiles:
+                if profile['name'] == profile_name:
+                    return profile
+            return None
+        except Exception as e:
+            print(f"❌ Error finding profile {profile_name}: {str(e)}")
+            return None       

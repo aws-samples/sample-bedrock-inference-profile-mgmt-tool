@@ -8,6 +8,7 @@ This tool provides a comprehensive solution for managing AWS Bedrock Application
   - Foundation Model support
   - Cross-region Inference Profile support
 - Batch create Application Inference Profiles from a yaml file
+- **Batch tag existing Application Inference Profiles from a yaml file**
 - Created profiles are exported to CSV automatically
 - Tag management for inference profiles
 - List existing Application inference profiles
@@ -77,6 +78,12 @@ The tool will guide you through:
 Run the tool in batch creation mode:
 ```bash
 python3 bedrock_inference_profile_management_tool.py -f ./bedrock-profiles.yaml
+```
+
+### Batch Tagging Existing Inference Profiles from a yaml file
+Run the tool in batch tagging mode:
+```bash
+python3 bedrock_inference_profile_management_tool.py -t ./bedrock-profiles.yaml
 ```
 
 ### Listing and Managing Existing Profiles
